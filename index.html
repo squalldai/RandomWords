@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>随机单词 + Gemini 小故事生成器</title>
+  <title>随机单词 + Gemini 小故事生成器 (1.3)</title>
   <style>
     body {
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
@@ -55,8 +55,9 @@
       cursor: pointer;
       transition: all 0.2s;
       margin: 1rem 0;
+      min-width: 280px;
     }
-    button:hover {
+    button:hover:not(:disabled) {
       background: #3182ce;
       transform: translateY(-2px);
     }
@@ -99,18 +100,18 @@
 <body>
 
   <div class="container">
-    <h1>随机单词 + 小故事生成器 (Gemini)</h1>
+    <h1>随机单词 + 小故事生成器 (1.3)</h1>
     
     <div id="words" class="word-box">
       点击按钮开始抽取单词和生成故事！
     </div>
 
-    <button id="generateBtn" type="button">抽取 & 用Gemini生成小故事</button>
+    <button id="generateBtn" type="button">抽取 & 生成小故事</button>
 
     <div id="status"></div>
 
     <div id="stories">
-      <h3>一个小故事（小学五年级水平，约60秒朗读）</h3>
+      <h3>一个小故事（小学四年级水平，约60秒朗读）</h3>
       <div id="storyList" class="story"></div>
     </div>
   </div>
@@ -154,13 +155,25 @@
       const storiesDiv = document.getElementById("stories");
       const storyList = document.getElementById("storyList");
 
+      // 禁用按钮并启动 10 秒倒计时
       btn.disabled = true;
+      let countdown = 10;
+      const originalText = btn.textContent;
+      const timer = setInterval(() => {
+        countdown--;
+        btn.textContent = `请等待 ${countdown} 秒...`;
+        if (countdown <= 0) {
+          clearInterval(timer);
+          btn.textContent = originalText;
+          btn.disabled = false;
+        }
+      }, 1000);
+
       status.textContent = "正在抽词并请求Gemini生成故事... 请稍等";
       storiesDiv.classList.remove("show");
       storyList.innerHTML = "";
 
       try {
-        // 1. 随机抽词
         const adjFull = getRandom(adjs);
         const nounFull = getRandom(nouns);
         const verbFull = getRandom(verbs);
@@ -169,27 +182,26 @@
         const noun = nounFull.split(" ")[0];
         const verb = verbFull.split(" ")[0];
 
-        // 显示单词
         document.getElementById("words").innerHTML = `
           <span class="word">${adjFull}</span><span class="type">(adj.)</span><br>
           <span class="word">${nounFull}</span><span class="type">(n.)</span><br>
           <span class="word">${verbFull}</span><span class="type">(v.)</span>
         `;
 
-        // 2. 新 prompt：一个完整故事 ≈8句，关键词加粗
-        const prompt = `Write exactly one short, complete English story with about 7 to 9 sentences. 
-The story must naturally include and use these three words: 
+        // 1.3 版本 prompt：难度降为小学四年级
+        const prompt = `Write exactly one very short and simple English story with 6 to 9 sentences. 
+The story must use these three words naturally: 
 adjective "${adj}", noun "${noun}", verb "${verb}". 
 
-Use very simple and easy English words suitable for Chinese 5th grade primary school students. 
-Make the story positive, fun, and interesting. 
-It should be easy to read aloud and take about 60 seconds in total. 
+Use very very easy English words for Chinese 4th grade primary school students. 
+Use short sentences. 
+Make the story happy, fun, and easy to understand. 
+It should be good to read aloud and take about 50 to 60 seconds. 
 
-In the story, make the three words appear in **bold** like this: **${adj}**, **${noun}**, **${verb}**. 
-Use bold **only** for these three exact words (case-sensitive), do not bold other words. 
-Do not add any title, number, explanation, or extra text outside the story itself.`;
+In the story, show the three words in **bold** like this: **${adj}**, **${noun}**, **${verb}**. 
+Only make these three words bold, nothing else. 
+Do not add title, numbers, or any extra words outside the story.`;
 
-        // 3. 调用 Gemini API
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`,
           {
@@ -199,7 +211,7 @@ Do not add any title, number, explanation, or extra text outside the story itsel
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: {
                 temperature: 0.8,
-                maxOutputTokens: 800,
+                maxOutputTokens: 700,
                 topP: 0.95
               }
             })
@@ -218,24 +230,23 @@ Do not add any title, number, explanation, or extra text outside the story itsel
           throw new Error("Gemini没有返回有效内容");
         }
 
-        // 简单清理：去除可能的开头结尾多余空行
         generatedText = generatedText.trim();
 
-        // 显示故事（strong 会自动渲染为粗体）
         storyList.innerHTML = generatedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
         storiesDiv.classList.add("show");
         status.textContent = "生成完成！";
 
       } catch (err) {
-        status.textContent = `出错：${err.message}（可能是API Key无效、配额用完、网络问题或模型不可用）`;
+        status.textContent = `出错：${err.message}（可能是API问题、配额用完或网络问题）`;
         console.error(err);
-      } finally {
+        // 出错时也恢复按钮
+        clearInterval(timer);
+        btn.textContent = originalText;
         btn.disabled = false;
       }
     }
 
-    // 事件绑定
     document.addEventListener("DOMContentLoaded", function() {
       document.getElementById("generateBtn").addEventListener("click", generate);
     });
