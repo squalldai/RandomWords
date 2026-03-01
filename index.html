@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>随机单词 + Gemini 小故事生成器 (1.5 - 防截断加强)</title>
+  <title>随机单词 + Gemini 小故事生成器 (1.6)</title>
   <style>
     body {
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
@@ -44,8 +44,8 @@
       border-radius: 50px;
       cursor: pointer;
       transition: all 0.2s;
-      margin: 1rem 0;
-      min-width: 280px;
+      margin: 1rem 0.5rem;
+      min-width: 180px;
     }
     button:hover:not(:disabled) { background: #3182ce; transform: translateY(-2px); }
     button:disabled { background: #a0aec0; cursor: not-allowed; }
@@ -57,18 +57,43 @@
       border-radius: 12px;
       border: 1px solid #e2e8f0;
       display: none;
+      position: relative;
+      overflow: hidden;
     }
     #stories.show { display: block; }
     #stories h3 { margin: 0 0 1rem 0; color: #2d3748; }
-    .story { margin: 0.9rem 0; line-height: 1.6; font-size: 1.1rem; }
+    .story-container {
+      position: relative;
+    }
+    .story {
+      margin: 0.9rem 0;
+      line-height: 1.6;
+      font-size: 1.1rem;
+      transition: filter 0.4s ease, opacity 0.4s ease;
+    }
     .story strong { font-weight: bold; color: #2b6cb0; }
+    .blur-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(240, 244, 248, 0.4);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 8px;
+      transition: opacity 0.4s ease;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .blur-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
     #status { color: #e53e3e; margin: 1rem 0; min-height: 1.2em; }
   </style>
 </head>
 <body>
 
   <div class="container">
-    <h1>随机单词 + 小故事生成器 (1.5)</h1>
+    <h1>随机单词 + 小故事生成器 (1.6)</h1>
     
     <div id="words" class="word-box">
       点击按钮开始抽取单词和生成故事！
@@ -80,7 +105,11 @@
 
     <div id="stories">
       <h3>一个小故事（小学四年级水平，约60秒朗读）</h3>
-      <div id="storyList" class="story"></div>
+      <div class="story-container">
+        <div class="blur-overlay" id="blurOverlay"></div>
+        <div id="storyList" class="story"></div>
+      </div>
+      <button id="toggleAnswerBtn" type="button" style="display:none;">显示答案</button>
     </div>
   </div>
 
@@ -103,8 +132,8 @@
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
-              temperature: 0.65,         // 降低，增加稳定性
-              maxOutputTokens: 1500,     // 更大缓冲
+              temperature: 0.65,
+              maxOutputTokens: 1500,
               topP: 0.95
             }
           })
@@ -127,7 +156,7 @@
     async function generateStoryWithRetry(adj, noun, verb) {
       let fullStory = "";
       let attempt = 0;
-      const maxAttempts = 3;  // 最多尝试 3 次
+      const maxAttempts = 3;
 
       while (attempt < maxAttempts) {
         const continuationPrompt = attempt > 0 
@@ -146,10 +175,9 @@ Do not add title, numbers, explanations, or any extra text. Just write the story
 
         fullStory = await callGemini(continuationPrompt, fullStory);
 
-        // 检测是否足够完整
         const sentences = fullStory.split(/[.!?]\s*/).filter(s => s.trim().length > 3);
         if (sentences.length >= 6 && !fullStory.trim().endsWith(",") && !fullStory.trim().endsWith("and")) {
-          break;  // 完整，停止重试
+          break;
         }
         attempt++;
       }
@@ -162,9 +190,11 @@ Do not add title, numbers, explanations, or any extra text. Just write the story
       const status = document.getElementById("status");
       const storiesDiv = document.getElementById("stories");
       const storyList = document.getElementById("storyList");
+      const toggleBtn = document.getElementById("toggleAnswerBtn");
+      const blurOverlay = document.getElementById("blurOverlay");
 
       btn.disabled = true;
-      let countdown = 10;
+      let countdown = 30;
       const originalText = btn.textContent;
       const timer = setInterval(() => {
         countdown--;
@@ -176,9 +206,11 @@ Do not add title, numbers, explanations, or any extra text. Just write the story
         }
       }, 1000);
 
-      status.textContent = "正在抽词并生成故事（加强防截断）...";
+      status.textContent = "正在抽词并生成故事...";
       storiesDiv.classList.remove("show");
       storyList.innerHTML = "";
+      toggleBtn.style.display = "none";
+      blurOverlay.classList.remove("hidden");
 
       try {
         const adjFull = getRandom(adjs);
@@ -201,11 +233,16 @@ Do not add title, numbers, explanations, or any extra text. Just write the story
 
         storyList.innerHTML = generatedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
+        // 显示故事区域，但内容默认被毛玻璃盖住
         storiesDiv.classList.add("show");
-        status.textContent = `生成完成！（尝试次数：${attempt + 1}）`;
+        toggleBtn.style.display = "inline-block";
+        toggleBtn.textContent = "显示答案";
+        blurOverlay.classList.remove("hidden");  // 确保初始模糊
+
+        status.textContent = "故事已生成（点击“显示答案”查看）";
 
       } catch (err) {
-        status.textContent = `出错：${err.message}（API问题或配额用完）`;
+        status.textContent = `出错：${err.message}`;
         console.error(err);
       } finally {
         clearInterval(timer);
@@ -213,6 +250,22 @@ Do not add title, numbers, explanations, or any extra text. Just write the story
         btn.disabled = false;
       }
     }
+
+    // 显示/隐藏答案按钮逻辑
+    document.getElementById("toggleAnswerBtn").addEventListener("click", function() {
+      const blurOverlay = document.getElementById("blurOverlay");
+      const toggleBtn = this;
+
+      if (blurOverlay.classList.contains("hidden")) {
+        // 当前可见 → 隐藏
+        blurOverlay.classList.remove("hidden");
+        toggleBtn.textContent = "显示答案";
+      } else {
+        // 当前隐藏 → 显示
+        blurOverlay.classList.add("hidden");
+        toggleBtn.textContent = "隐藏答案";
+      }
+    });
 
     document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("generateBtn").addEventListener("click", generate);
