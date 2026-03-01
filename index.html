@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>随机单词 + Gemini 小故事生成器 (1.7)</title>
+  <title>随机单词 + Gemini 小故事生成器 (1.8 - Key 手動輸入)</title>
   <style>
     body {
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
@@ -93,7 +93,7 @@
 <body>
 
   <div class="container">
-    <h1>随机单词 + 小故事生成器 (1.7)</h1>
+    <h1>随机单词 + 小故事生成器 (1.8)</h1>
     
     <div id="words" class="word-box">
       点击按钮开始抽取单词和生成故事！
@@ -114,13 +114,27 @@
   </div>
 
   <script>
-    const PASSWORD = "999";  // 固定密碼
+    const PASSWORD = "888";  // 已修改為 888
+
+    // 檢查並載入儲存的 API Key（只輸入一次）
+    let API_KEY = localStorage.getItem('gemini_api_key');
+
+    if (!API_KEY) {
+      API_KEY = prompt("請輸入你的 Gemini API Key（只輸入一次，下次自動記住）：");
+      if (API_KEY && API_KEY.trim() !== "") {
+        localStorage.setItem('gemini_api_key', API_KEY.trim());
+        alert("Key 已儲存，下次開啟網頁自動使用！");
+      } else {
+        alert("未輸入有效 Key，無法生成故事。請重新開啟網頁輸入。");
+        document.getElementById("generateBtn").disabled = true;
+        document.getElementById("status").textContent = "缺少 API Key，請重新開啟網頁輸入 Key。";
+      }
+    }
 
     const nouns = ["banana 香蕉","calendar 日历","classroom 教室","dinosaur 恐龙","doll 玩偶","envelope 信封","furniture 家具","giraffe 长颈鹿","hat 帽子","helicopter 直升机","instrument 乐器","kangaroo 袋鼠","kite 风筝","lamp 台灯","laboratory 实验室","magazine 杂志","moon 月亮","necklace 项链","question 问题","restaurant 餐厅","suitcase 手提箱","wallet 钱包"];
     const verbs = ["buy 购买","clean 打扫","climb 攀爬","cook 做饭","dance 跳舞","draw 画画","drive 驾驶","enlarge 扩大","examine 检查","float 漂浮","help 帮助","investigate 调查","jump 跳跃","listen 听","play 玩、演奏","read 阅读","ride 骑","sell 卖","swim 游泳","watch 观看","wash 清洗","write 写"];
     const adjs = ["artificial 人造的","brilliant 聪明的、出色的","careful 小心的","changeable 多变的","dull 无聊的、暗淡的","essential 重要的、必要的","generous 慷慨的","hard 困难的、坚硬的","honest 诚实的","light 轻的、明亮的","loud 大声的","mild 温和的","obvious 明显的","popular 受欢迎的","powerful 强大的","reliable 可靠的","fantastic 极好的","strange 奇怪的","terrific 很棒的","vivid 生动的","quiet 安静的","slim 苗条的"];
 
-    const API_KEY = "AIzaSyA93MxkMFOZsEZv8fC5rAsMn6PJBIghVyI";
     const MODEL = "gemini-2.5-flash";
 
     function getRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -188,6 +202,11 @@ Do not add title, numbers, explanations, or any extra text. Just write the story
     }
 
     async function generate() {
+      if (!API_KEY) {
+        alert("缺少 API Key，請重新開啟網頁並輸入 Key。");
+        return;
+      }
+
       const btn = document.getElementById("generateBtn");
       const status = document.getElementById("status");
       const storiesDiv = document.getElementById("stories");
@@ -252,22 +271,19 @@ Do not add title, numbers, explanations, or any extra text. Just write the story
       }
     }
 
-    // 顯示/隱藏答案按鈕邏輯 + 密碼驗證
     document.getElementById("toggleAnswerBtn").addEventListener("click", function() {
       const blurOverlay = document.getElementById("blurOverlay");
       const toggleBtn = this;
 
       if (blurOverlay.classList.contains("hidden")) {
-        // 當前可見 → 隱藏（不需要密碼）
         blurOverlay.classList.remove("hidden");
         toggleBtn.textContent = "显示答案";
       } else {
-        // 當前隱藏 → 需要密碼才能顯示
         const input = prompt("请输入密码显示答案：");
         if (input === PASSWORD) {
           blurOverlay.classList.add("hidden");
           toggleBtn.textContent = "隐藏答案";
-        } else if (input !== null) {  // 取消不提示
+        } else if (input !== null) {
           alert("密码错误！");
         }
       }
