@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>随机单词 + Gemini 小故事生成器 (1.8 - Key 手動輸入)</title>
+  <title>随机单词 + Gemini 小故事生成器 (1.10)</title>
   <style>
     body {
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
@@ -88,12 +88,50 @@
       pointer-events: none;
     }
     #status { color: #e53e3e; margin: 1rem 0; min-height: 1.2em; }
+    #passwordModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+    }
+    .modal-content input {
+      width: 100%;
+      padding: 0.8rem;
+      margin: 1rem 0;
+      font-size: 1.2rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .modal-content button {
+      background: #4299e1;
+      color: white;
+      border: none;
+      padding: 0.8rem 2rem;
+      border-radius: 50px;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+    .modal-content button:hover {
+      background: #3182ce;
+    }
   </style>
 </head>
 <body>
 
   <div class="container">
-    <h1>随机单词 + 小故事生成器 (1.8)</h1>
+    <h1>随机单词 + 小故事生成器 (1.10)</h1>
     
     <div id="words" class="word-box">
       点击按钮开始抽取单词和生成故事！
@@ -104,7 +142,7 @@
     <div id="status"></div>
 
     <div id="stories">
-      <h3>一个小故事（小学四年级水平，约60秒朗读）</h3>
+      <h3>一个小故事（小学三年级水平，约60秒朗读）</h3>
       <div class="story-container">
         <div class="blur-overlay" id="blurOverlay"></div>
         <div id="storyList" class="story"></div>
@@ -113,10 +151,19 @@
     </div>
   </div>
 
-  <script>
-    const PASSWORD = "888";  // 已修改為 888
+  <!-- 密碼輸入彈窗 -->
+  <div id="passwordModal">
+    <div class="modal-content">
+      <h2>请输入密码</h2>
+      <input type="password" id="passwordInput" placeholder="••••••" autocomplete="off">
+      <button id="submitPassword">确认</button>
+    </div>
+  </div>
 
-    // 檢查並載入儲存的 API Key（只輸入一次）
+  <script>
+    const PASSWORD = "888";
+
+    // 檢查並載入儲存的 API Key
     let API_KEY = localStorage.getItem('gemini_api_key');
 
     if (!API_KEY) {
@@ -176,12 +223,14 @@
 
       while (attempt < maxAttempts) {
         const continuationPrompt = attempt > 0 
-          ? `Continue the story from exactly where it stopped. Do NOT repeat previous sentences. Finish the story with a happy ending. Add more sentences until there are at least 6 sentences in total. Use very simple 4th grade English. Keep bold for the three words if they appear again. Previous part: "${fullStory}"`
+          ? `Continue the story from exactly where it stopped. Do NOT repeat previous sentences. Finish the story with a happy ending. Add more sentences until there are at least 6 sentences in total. Use very simple 3rd grade English. Keep bold for the three words if they appear again. Previous part: "${fullStory}"`
           : `Write one very short and simple English story. It MUST have exactly 6 to 9 complete sentences. Do NOT stop early or cut off mid-sentence.
 
 The story must naturally use these three words: adjective "${adj}", noun "${noun}", verb "${verb}".
 
-Use only very easy English words for Chinese 4th grade students. Use short and clear sentences. Make the story happy, fun, and easy to read aloud (about 50-60 seconds total).
+If the story needs a human character or main person (like a boy, girl, child, or friend), use the name Peter for the main person.
+
+Use only very easy English words for Chinese 3rd grade primary school students. Use short and clear sentences. Make the story happy, fun, and easy to read aloud (about 50-60 seconds total).
 
 The story needs a clear beginning, middle, and happy ending. Finish the story completely. Write all sentences without stopping.
 
@@ -271,21 +320,46 @@ Do not add title, numbers, explanations, or any extra text. Just write the story
       }
     }
 
-    document.getElementById("toggleAnswerBtn").addEventListener("click", function() {
-      const blurOverlay = document.getElementById("blurOverlay");
-      const toggleBtn = this;
+    // 自訂密碼輸入彈窗邏輯（輸入時顯示 *）
+    const passwordModal = document.getElementById("passwordModal");
+    const passwordInput = document.getElementById("passwordInput");
+    const submitPassword = document.getElementById("submitPassword");
+    const toggleBtn = document.getElementById("toggleAnswerBtn");
+    const blurOverlay = document.getElementById("blurOverlay");
 
+    toggleBtn.addEventListener("click", function() {
       if (blurOverlay.classList.contains("hidden")) {
         blurOverlay.classList.remove("hidden");
         toggleBtn.textContent = "显示答案";
       } else {
-        const input = prompt("请输入密码显示答案：");
-        if (input === PASSWORD) {
-          blurOverlay.classList.add("hidden");
-          toggleBtn.textContent = "隐藏答案";
-        } else if (input !== null) {
-          alert("密码错误！");
-        }
+        passwordModal.style.display = "flex";
+        passwordInput.value = "";
+        passwordInput.focus();
+      }
+    });
+
+    submitPassword.addEventListener("click", function() {
+      if (passwordInput.value === PASSWORD) {
+        blurOverlay.classList.add("hidden");
+        toggleBtn.textContent = "隐藏答案";
+        passwordModal.style.display = "none";
+      } else {
+        alert("密码错误！");
+        passwordInput.value = "";
+      }
+    });
+
+    // 按 Enter 也可提交
+    passwordInput.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") {
+        submitPassword.click();
+      }
+    });
+
+    // 點擊彈窗外關閉
+    passwordModal.addEventListener("click", function(e) {
+      if (e.target === passwordModal) {
+        passwordModal.style.display = "none";
       }
     });
 
